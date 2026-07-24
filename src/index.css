@@ -1,0 +1,260 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 淺色為預設。深色以 :root[data-theme='dark'] 覆寫，
+   index.html 會在 JS 載入前先把 data-theme 補上，避免閃一下白畫面。 */
+:root {
+  --bg: #ececec;
+  --panel: #fff;
+  --line: #b8b8b8;
+  --fg: #1a1a1a;
+  --dim: #5c5c5c;
+  --off: #9a9a9a;
+  --accent: #b45309; /* 選取中的控制項 */
+  --link: #1149c4; /* 未選取的控制項 */
+  --map-bg: #fff;
+  --ok: #157f3d;
+  --warn: #a15c00;
+  --bad: #c62828;
+}
+
+:root[data-theme='dark'] {
+  --bg: #000;
+  --panel: #111;
+  --line: #444;
+  --fg: #ccc;
+  --dim: #777;
+  --off: #555;
+  --accent: #f90;
+  --link: #39f;
+  --map-bg: #2a2a2a;
+  --ok: #3c3;
+  --warn: #fc0;
+  --bad: #f44;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    12px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'DejaVu Sans Mono',
+    monospace;
+}
+
+/* 靠左上，不置中：與 NIED 強震モニタ 的版面一致。 */
+#root {
+  min-height: 100svh;
+  padding: 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.wrap {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0 3px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+header .btn {
+  margin-left: auto;
+}
+
+/* 次要控制項：與分頁同風格但較小。 */
+.btn {
+  min-height: 26px;
+  padding: 3px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--link);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--dim);
+  color: var(--fg);
+}
+
+.btn:disabled {
+  color: var(--off);
+  cursor: default;
+}
+
+.btn:focus-visible {
+  outline: 1px dotted var(--accent);
+  outline-offset: 2px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+/* 復古控制項：直角、1px 外框，未選取藍字、選取橘框橘字。 */
+.tabs button {
+  min-width: 96px;
+  min-height: 34px;
+  padding: 4px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--link);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.tabs button:hover:not(:disabled) {
+  border-color: var(--dim);
+}
+
+.tabs button:disabled {
+  color: var(--off);
+  cursor: default;
+}
+
+.tabs button[aria-selected='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tabs button:focus-visible {
+  outline: 1px dotted var(--accent);
+  outline-offset: 2px;
+}
+
+/* 底圖的海是淺色或深灰，隨主題換，圖片載入前才不會突兀。 */
+.stack {
+  position: relative;
+  /* 圖層原生寬度的 2/3（+2px 是左右外框，讓圖本身正好 504px）；
+     視窗更窄時再等比縮小。 */
+  width: calc(756px * 2 / 3 + 2px);
+  max-width: 100%;
+  background: var(--map-bg);
+  border: 1px solid var(--line);
+}
+
+/* 第一張底圖撐開高度，其餘疊在上面。四張圖長寬比相同，縮放後仍然對齊。 */
+.stack img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.stack img:not(:first-child) {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  color: var(--dim);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  background: var(--off);
+  flex: none;
+}
+
+.dot.live {
+  background: var(--ok);
+  animation: blink 1s steps(1, end) infinite;
+}
+
+.dot.lag {
+  background: var(--warn);
+}
+
+.dot.down {
+  background: var(--bad);
+}
+
+.dot.replay {
+  background: var(--link);
+}
+
+.state {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.time {
+  margin-left: auto;
+}
+
+.replay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+
+.replay input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot.live {
+    animation: none;
+  }
+}
+
+.noscript {
+  display: inline-block;
+  margin: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  color: var(--bad);
+}

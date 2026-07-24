@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ececec" />
+    <meta name="description" content="強震監視器 — 計測震度 / PGA / PGV" />
+    <title>強震監視器</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1117'/%3E%3Cpath d='M3 17h4.5l3-8 4.5 15 3.5-10 2.5 3H29' fill='none' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://api.lb.exptech.dev" crossorigin />
+    <!-- 在樣式套用前就決定主題，深色使用者才不會先閃一下白畫面。 -->
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.theme === 'dark' ? 'dark' : 'light'
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p class="noscript">此頁需要 JavaScript 才能載入即時觀測資料。</p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
