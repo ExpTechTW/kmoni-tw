@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LAYERS,
   LAYER_KEYS,
@@ -39,7 +39,8 @@ export default function App() {
   // 重播只有全國視野，底圖要跟著換，否則會配上對不起來的資料圖。
   const region = shownRegion(regionOf(regionKey), at)
   const active = LAYERS.find((l) => l.key === layer) ?? LAYERS[0]
-  const { frame, status } = useLayerFrame(layer, region, at, paused)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { status } = useLayerFrame(canvasRef, layer, region, at, paused)
   const level = useLevel(at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
 
@@ -145,7 +146,7 @@ export default function App() {
       {/* 由下往上：底圖、資料圖、圖例。資料圖不分深淺色。 */}
       <div className="stack">
         <img src={basemapOf(region, theme)} alt={`${region.label}底圖`} decoding="async" />
-        {frame && <img src={frame} alt="" decoding="async" />}
+        <canvas ref={canvasRef} width={756} height={648} aria-hidden />
         <img src={active.legend} alt={`${active.label}圖例`} decoding="async" />
       </div>
 

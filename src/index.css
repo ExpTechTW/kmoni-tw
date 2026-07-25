@@ -177,14 +177,16 @@ header .btn {
   border: 1px solid var(--line);
 }
 
-/* 第一張底圖撐開高度，其餘疊在上面。四張圖長寬比相同，縮放後仍然對齊。 */
-.stack img {
+/* 第一張底圖撐開高度，其餘（資料圖 canvas、圖例）疊在上面。
+   三者長寬比相同，縮放後仍然逐像素對齊。 */
+.stack img,
+.stack canvas {
   display: block;
   width: 100%;
   height: auto;
 }
 
-.stack img:not(:first-child) {
+.stack > :not(:first-child) {
   position: absolute;
   top: 0;
   left: 0;

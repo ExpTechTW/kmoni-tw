@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, type RefObject } from 'react'
 import { frameUrl, type LayerKey, type Region } from '@/config'
 import { useNow } from '@/useNow'
 
@@ -24,42 +24,40 @@ interface Outcome {
 }
 
 /**
- * 取得指定圖層／區域的影像。at 為 null 表示持續追最新影像，
- * 否則只抓該 unix 秒的重播影像一次。paused 在即時模式下會停止輪詢，
- * 畫面停在最後一張。
+ * 取得指定圖層／區域的影像並畫到 canvas 上。at 為 null 表示持續追最新影像，
+ * 否則只抓該 unix 秒的重播影像一次。paused 在即時模式下會停止輪詢。
+ *
+ * 影像刻意走 createImageBitmap + drawImage + close()，而不是 blob URL 配 <img>：
+ * 後者每秒都會產生一個新網址，Chrome 的影像快取以網址為鍵保留「解碼後」的點陣圖
+ * （756×648×4 ≈ 2 MB／張），撤銷網址並不會馬上釋放它，實測記憶體會以每秒約 1.7 MB
+ * 一路長到記憶體壓力才回收。close() 則是立即歸還，長時間開著也不會累積。
  *
  * 災時網路狀況通常很差，所以即時模式刻意做到：請求不堆疊（前一次結束才排下一次，
- * 網路越慢自動降頻）、卡住的請求會逾時重試、新影像解碼完成才換上畫面（不閃爍）、
- * 分頁在背景時完全不抓圖。
+ * 網路越慢自動降頻）、卡住的請求會逾時重試、分頁在背景時完全不抓圖。
  */
 export function useLayerFrame(
+  canvasRef: RefObject<HTMLCanvasElement | null>,
   layer: LayerKey,
   region: Region,
   at: number | null,
   paused: boolean,
 ) {
-  const [frame, setFrame] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [lastOk, setLastOk] = useState(0)
   const [fails, setFails] = useState(0)
-  const shown = useRef<string | null>(null)
   const now = useNow(PERIOD)
 
   const url = frameUrl(layer, region, at)
   const live = at === null
 
-  // 換圖層或區域時清掉舊影像，避免 PGA 的資料配上 PGV 的圖例。
+  // 換圖層或區域時清掉畫面，避免 PGA 的資料配上 PGV 的圖例。
   // 只前進重播時刻時不清，畫面才不會每幀閃一下。
   useEffect(() => {
-    revoke(shown)
-    setFrame(null)
+    clear(canvasRef.current)
     setOutcome(null)
     setLastOk(0)
     setFails(0)
-  }, [layer, region.key])
-
-  // 卸載時回收最後一張；其餘的在換新影像時就地回收。
-  useEffect(() => () => revoke(shown), [])
+  }, [canvasRef, layer, region.key])
 
   useEffect(() => {
     // 即時模式暫停：停止輪詢，畫面停在最後一張。
@@ -86,23 +84,15 @@ export function useLayerFrame(
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
-        const objectUrl = URL.createObjectURL(await res.blob())
-
-        // 先解碼再換上畫面，換圖時就不會閃爍或出現半張圖。
-        const decoded = new Image()
-        decoded.src = objectUrl
-        await decoded.decode()
-
-        if (stopped) {
-          URL.revokeObjectURL(objectUrl)
-          return
+        const bitmap = await createImageBitmap(await res.blob())
+        try {
+          if (stopped) return
+          paint(canvasRef.current, bitmap)
+        } finally {
+          // 無論有沒有畫上去都要歸還，這是不累積記憶體的關鍵。
+          bitmap.close()
         }
 
-        // 一秒一張，不回收會持續累積記憶體。
-        revoke(shown)
-        shown.current = objectUrl
-
-        setFrame(objectUrl)
         setLastOk(Date.now())
         setFails(0)
         setOutcome({ url, ok: true })
@@ -123,16 +113,30 @@ export function useLayerFrame(
       clearTimeout(timer)
       aborter.abort()
     }
-  }, [url, live, paused])
+  }, [canvasRef, url, live, paused])
 
-  return { frame, status: describe({ live, paused, at, url, outcome, lastOk, fails, now }) }
+  return { status: describe({ live, paused, at, url, outcome, lastOk, fails, now }) }
 }
 
-function revoke(ref: { current: string | null }) {
-  if (ref.current) {
-    URL.revokeObjectURL(ref.current)
-    ref.current = null
+function paint(canvas: HTMLCanvasElement | null, bitmap: ImageBitmap) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  // 只在尺寸真的不同時才改，設定 width/height 會重新配置整塊 buffer。
+  if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
   }
+
+  // 資料圖有透明區域，不清掉的話舊的測站點會殘留。
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(bitmap, 0, 0)
+}
+
+function clear(canvas: HTMLCanvasElement | null) {
+  const ctx = canvas?.getContext('2d')
+  if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
 
 function clock(ms: number): string {
