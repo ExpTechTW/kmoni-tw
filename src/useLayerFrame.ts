@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { frameUrl, type LayerKey, type Region } from '@/config'
+import { frameUrl, type LayerKey, type Mode, type Region } from '@/config'
 import { useNow } from '@/useNow'
 
 const PERIOD = 1000 //  即時模式每秒發一次請求（固定節奏，不受 RTT 影響）
@@ -9,7 +9,7 @@ const DEAD = 12000 //   超過此毫秒數未更新視為中斷
 const MAX_FAILS = 3 //  連續失敗幾次後視為中斷
 const MAX_INFLIGHT = 4 // 同時在途的請求上限，網路太慢時就跳過該輪
 
-export type Tone = 'init' | 'live' | 'lag' | 'down' | 'replay' | 'paused'
+export type Tone = 'init' | 'live' | 'near' | 'lag' | 'down' | 'replay' | 'paused'
 
 export interface Status {
   tone: Tone
@@ -46,6 +46,7 @@ interface Outcome {
  */
 export function useLayerFrame(
   canvasRef: RefObject<HTMLCanvasElement | null>,
+  mode: Mode,
   layer: LayerKey,
   region: Region,
   at: number | null,
@@ -62,7 +63,7 @@ export function useLayerFrame(
   const gen = useRef(0) //      圖層／區域的世代，換了就作廢所有在途結果
   const inflight = useRef(new Set<AbortController>())
 
-  const url = frameUrl(layer, region, at)
+  const url = frameUrl(mode, layer, region, at)
   const live = at === null
 
   // 換圖層或區域時清掉畫面，避免 PGA 的資料配上 PGV 的圖例，
@@ -78,7 +79,7 @@ export function useLayerFrame(
     setOutcome(null)
     setLastOk(0)
     setFails(0)
-  }, [canvasRef, layer, region.key])
+  }, [canvasRef, mode.key, layer, region.key])
 
   // 卸載時收乾淨。
   useEffect(() => {
@@ -153,7 +154,7 @@ export function useLayerFrame(
     }
   }, [canvasRef, url, live, paused])
 
-  return { status: describe({ live, paused, at, url, outcome, lastOk, fails, now }) }
+  return { status: describe({ live, paused, at, url, outcome, lastOk, fails, now, mode }) }
 }
 
 function paint(canvas: HTMLCanvasElement | null, bitmap: ImageBitmap) {
@@ -190,6 +191,7 @@ function describe(s: {
   lastOk: number
   fails: number
   now: number
+  mode: Mode
 }): Status {
   if (!s.live) {
     const stamp = s.at === null ? '' : clock(s.at * 1000)
@@ -223,5 +225,6 @@ function describe(s: {
 
   if (s.fails >= MAX_FAILS || age > DEAD) return { tone: 'down', text: '連線中斷', stamp }
   if (age > STALE) return { tone: 'lag', text: `延遲 ${Math.round(age / 1000)} 秒`, stamp }
-  return { tone: 'live', text: '即時', stamp }
+  // 指示燈的文字與顏色都跟著資料來源走（即時／近即時），不是一律綠燈寫「即時」。
+  return { tone: s.mode.tone, text: s.mode.label, stamp }
 }

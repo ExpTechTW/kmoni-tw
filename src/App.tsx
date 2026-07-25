@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  LAYERS,
   LAYER_KEYS,
+  MODES,
+  MODE_KEYS,
   REGIONS,
   REGION_KEYS,
   REPLAY_FRAME_MS,
@@ -10,9 +11,13 @@ import {
   REPLAY_WINDOW_SEC,
   basemapOf,
   levelTone,
+  modeReady,
   regionOf,
+  resolveLayer,
+  resolveMode,
   shownRegion,
   type LayerKey,
+  type ModeKey,
   type RegionKey,
   type Theme,
 } from '@/config'
@@ -29,7 +34,8 @@ export default function App() {
   const [regionKey, setRegionKey] = useState<RegionKey>(() =>
     loadPref('region', REGION_KEYS, 'all'),
   )
-  const [layer, setLayer] = useState<LayerKey>(() => loadPref('layer', LAYER_KEYS, 'int'))
+  const [modeKey, setModeKey] = useState<ModeKey>(() => loadPref('mode', MODE_KEYS, 'realtime'))
+  const [layerKey, setLayerKey] = useState<LayerKey>(() => loadPref('layer', LAYER_KEYS, 'int'))
 
   // at 為 null 代表即時模式。重播位置不記憶，重開一律回到即時。
   const [at, setAt] = useState<number | null>(null)
@@ -39,10 +45,13 @@ export default function App() {
   const replaying = at !== null
   // 重播只有全國視野，底圖要跟著換，否則會配上對不起來的資料圖。
   const region = shownRegion(regionOf(regionKey), at)
-  const active = LAYERS.find((l) => l.key === layer) ?? LAYERS[0]
+  // 記住的模式／圖層可能還沒就緒，一律換算成真的能用的那一個。
+  const mode = resolveMode(modeKey)
+  const active = resolveLayer(mode, layerKey)
+  const layer = active.key
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { status } = useLayerFrame(canvasRef, layer, region, at, paused)
-  const level = useLevel(at, paused)
+  const { status } = useLayerFrame(canvasRef, mode, layer, region, at, paused)
+  const level = useLevel(mode, at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
 
   // focus 區域的中心會變，底圖定時從 raw 更新；抓不到就沿用 bundle 內的。
@@ -59,6 +68,7 @@ export default function App() {
   }, [theme])
 
   useEffect(() => savePref('region', regionKey), [regionKey])
+  useEffect(() => savePref('mode', modeKey), [modeKey])
   useEffect(() => savePref('layer', layer), [layer])
 
   // 重播播放：每 REPLAY_FRAME_MS 前進 REPLAY_STEP_SEC 秒，最多到最新的封存時刻。
@@ -79,14 +89,25 @@ export default function App() {
     if (replaying && at !== null && at >= nowSec - REPLAY_LAG_SEC) setPaused(true)
   }, [replaying, at, nowSec])
 
+  // 切到沒有封存的模式時要離開重播，否則會一直抓不到影像。
+  useEffect(() => {
+    if (!mode.replay) setAt(null)
+  }, [mode.replay])
+
+  // 數字鍵切換目前模式底下「可用」的圖層。
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const i = '123'.indexOf(e.key)
-      if (i >= 0) setLayer(LAYERS[i].key)
+      // 焦點在下拉選單或時間軸上時交給元件自己處理，別搶數字鍵。
+      const el = e.target as HTMLElement | null
+      if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return
+
+      const i = Number(e.key) - 1
+      const usable = mode.layers.filter((l) => l.ready)
+      if (i >= 0 && i < usable.length) setLayerKey(usable[i].key)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [mode.layers])
 
   // 滑桿是「距現在幾秒」。右端停在最新的封存時刻（而非現在），
   // 因為比那更新的時刻還沒有存檔，拉過去只會取不到影像。
@@ -119,6 +140,22 @@ export default function App() {
         </button>
       </header>
 
+      {/* 沒有任何可用圖層的模式先停用，免得選進去是一片死路。 */}
+      <nav className="tabs" role="tablist" aria-label="模式">
+        {MODES.map((m) => (
+          <button
+            key={m.key}
+            role="tab"
+            aria-selected={m.key === mode.key}
+            disabled={!modeReady(m)}
+            title={modeReady(m) ? undefined : '此模式的圖層後端尚未提供'}
+            onClick={() => setModeKey(m.key)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </nav>
+
       {/* 重播中封存只有全國視野，focus 區域先停用，選取狀態也顯示實際呈現的區域。 */}
       <nav className="tabs" role="tablist" aria-label="區域">
         {REGIONS.map((r) => (
@@ -135,24 +172,28 @@ export default function App() {
         ))}
       </nav>
 
-      <nav className="tabs" role="tablist" aria-label="圖層">
-        {LAYERS.map((l) => (
-          <button
-            key={l.key}
-            role="tab"
-            aria-selected={l.key === layer}
-            onClick={() => setLayer(l.key)}
-          >
-            {l.label}
-          </button>
-        ))}
-      </nav>
+      {/* 圖層最多 10 個且名稱長，用下拉選單（NIED 強震モニタ 也是這樣）。 */}
+      <div className="picker">
+        <select
+          aria-label="圖層"
+          value={layer}
+          onChange={(e) => setLayerKey(e.target.value as LayerKey)}
+        >
+          {mode.layers.map((l) => (
+            <option key={l.key} value={l.key} disabled={!l.ready}>
+              {l.ready ? l.label : `${l.label}（尚未提供）`}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* 由下往上：底圖、資料圖、圖例。資料圖不分深淺色。 */}
       <div className="stack">
         <img src={basemap} alt={`${region.label}底圖`} decoding="async" />
         <canvas ref={canvasRef} width={756} height={648} aria-hidden />
-        <img src={active.legend} alt={`${active.label}圖例`} decoding="async" />
+        {active.legend && (
+          <img src={active.legend} alt={`${active.label}圖例`} decoding="async" />
+        )}
       </div>
 
       <footer>
@@ -164,6 +205,7 @@ export default function App() {
         <span className="time">{status.stamp}</span>
       </footer>
 
+      {/* 即時模式沒有封存，時間軸與回到最新一併停用（暫停仍可用，那是停止輪詢）。 */}
       <div className="replay">
         <input
           type="range"
@@ -171,6 +213,8 @@ export default function App() {
           max={-REPLAY_LAG_SEC}
           step={REPLAY_STEP_SEC}
           value={offset}
+          disabled={!mode.replay}
+          title={mode.replay ? undefined : `${mode.label}沒有封存資料，無法重播`}
           onChange={(e) => seek(Number(e.target.value))}
           aria-label="重播時間"
         />

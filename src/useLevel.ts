@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { levelUrl } from '@/config'
+import { levelUrl, type Mode } from '@/config'
 
 const PERIOD = 1000 //  即時模式每秒發一次請求（固定節奏，不受 RTT 影響）
 const TIMEOUT = 8000 //  單次請求逾時，避免慢速網路把更新迴圈卡死
@@ -13,14 +13,14 @@ const MAX_INFLIGHT = 2
  * 與影像同樣的節奏策略：固定每秒發送、慢回的結果依序號丟棄、在途過多就跳過該輪、
  * 分頁在背景時不抓。
  */
-export function useLevel(at: number | null, paused: boolean): number | null {
+export function useLevel(mode: Mode, at: number | null, paused: boolean): number | null {
   const [level, setLevel] = useState<number | null>(null)
   // 與影像同理：重播每秒換 at 時 effect 會重建，這些必須存活下來。
   const sent = useRef(0)
   const applied = useRef(0)
   const inflight = useRef(new Set<AbortController>())
 
-  const url = levelUrl(at)
+  const url = levelUrl(mode, at)
   const live = at === null
 
   useEffect(() => {

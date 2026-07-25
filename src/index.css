@@ -19,6 +19,7 @@
   --link: #1149c4; /* 未選取的控制項 */
   --map-bg: #fff;
   --ok: #157f3d;
+  --near: #0e7490; /* 近即時：青色，與綠燈及藍色重播燈都分得開 */
   --warn: #a15c00;
   --bad: #c62828;
   /* 震動等級：淺色底要夠深才看得清楚，黃色尤其不能用純黃。 */
@@ -40,6 +41,7 @@
   --link: #39f;
   --map-bg: #2a2a2a;
   --ok: #3c3;
+  --near: #2dd4bf;
   --warn: #fc0;
   --bad: #f44;
   --lv-blue: #4a9eff;
@@ -129,7 +131,50 @@ header .btn {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+/* 圖層下拉選單：外觀與選取中的分頁一致（橘框橘字）。 */
+.picker {
+  position: relative;
+}
+
+.picker select {
+  appearance: none;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 30px 4px 14px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.picker select:focus-visible {
+  outline: 1px dotted var(--accent);
+  outline-offset: 2px;
+}
+
+.picker select option:disabled {
+  color: var(--off);
+}
+
+/* 用 ::after 畫箭頭，才能跟著主題的 currentColor 走。 */
+.picker::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  margin-top: -3px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--accent);
+  pointer-events: none;
 }
 
 /* 復古控制項：直角、1px 外框，未選取藍字、選取橘框橘字。 */
@@ -209,9 +254,18 @@ footer {
   flex: none;
 }
 
+/* 即時與近即時都在持續更新，所以都會閃，但用不同顏色區分資料來源。 */
+.dot.live,
+.dot.near {
+  animation: blink 1s steps(1, end) infinite;
+}
+
 .dot.live {
   background: var(--ok);
-  animation: blink 1s steps(1, end) infinite;
+}
+
+.dot.near {
+  background: var(--near);
 }
 
 .dot.lag {
@@ -275,6 +329,13 @@ footer {
   cursor: pointer;
 }
 
+/* 沒有封存的模式：時間軸整條變灰，明確表示不能拖。 */
+.replay input[type='range']:disabled {
+  accent-color: var(--off);
+  cursor: default;
+  opacity: 0.55;
+}
+
 .disclaimer {
   padding: 1px 2px 0;
   color: var(--bad);
@@ -288,7 +349,8 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot.live {
+  .dot.live,
+  .dot.near {
     animation: none;
   }
 }
