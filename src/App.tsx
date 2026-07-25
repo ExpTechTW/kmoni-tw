@@ -175,6 +175,8 @@ export default function App() {
           即時模式
         </button>
       </div>
+
+      <p className="disclaimer">僅供參考，應以中央氣象署發布之內容為準</p>
     </div>
   )
 }
