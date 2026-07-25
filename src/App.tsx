@@ -17,6 +17,7 @@ import {
   type Theme,
 } from '@/config'
 import { loadPref, savePref } from '@/storage'
+import { useFocusBasemap } from '@/useFocusBasemap'
 import { useLayerFrame } from '@/useLayerFrame'
 import { useLevel } from '@/useLevel'
 import { useNow } from '@/useNow'
@@ -43,6 +44,10 @@ export default function App() {
   const { status } = useLayerFrame(canvasRef, layer, region, at, paused)
   const level = useLevel(at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
+
+  // focus 區域的中心會變，底圖定時從 raw 更新；抓不到就沿用 bundle 內的。
+  const liveFocus = useFocusBasemap(theme)
+  const basemap = region.focus && liveFocus ? liveFocus : basemapOf(region, theme)
 
   useEffect(() => {
     savePref('theme', theme)
@@ -145,7 +150,7 @@ export default function App() {
 
       {/* 由下往上：底圖、資料圖、圖例。資料圖不分深淺色。 */}
       <div className="stack">
-        <img src={basemapOf(region, theme)} alt={`${region.label}底圖`} decoding="async" />
+        <img src={basemap} alt={`${region.label}底圖`} decoding="async" />
         <canvas ref={canvasRef} width={756} height={648} aria-hidden />
         <img src={active.legend} alt={`${active.label}圖例`} decoding="async" />
       </div>

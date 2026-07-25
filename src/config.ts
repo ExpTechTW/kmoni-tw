@@ -82,6 +82,26 @@ export function shownRegion(region: Region, at: number | null): Region {
   return at === null ? region : REGIONS[0]
 }
 
+/**
+ * focus 底圖的執行時來源。
+ *
+ * focus 區域的中心會隨觀測熱點調整，底圖跟著重產；打包進 bundle 的是建置當下那一份，
+ * 長時間開著的頁面會出現底圖與資料圖對不上的情況。因此改成定時比對 info.json 裡的
+ * 雜湊，有變才從 raw 重抓。抓不到時（離線、GitHub 不通）沿用 bundle 內的底圖。
+ */
+const RAW = 'https://raw.githubusercontent.com/ExpTechTW/kmoni-tw/main'
+
+export const INFO_URL = `${RAW}/info.json`
+
+/** 每 10 分鐘比對一次雜湊。 */
+export const BASEMAP_REFRESH_MS = 10 * 60 * 1000
+
+export function focusBasemapUrl(theme: Theme, hash: string): string {
+  const name = theme === 'dark' ? 'taiwan_focus_dark' : 'taiwan_focus'
+  // 雜湊帶在 query，內容一換網址就換，瀏覽器不會拿到舊的快取。
+  return `${RAW}/src/assets/${name}.webp?h=${hash}`
+}
+
 /** 震動等級（純文字數字），即時與重播各有一個端點。 */
 export function levelUrl(at: number | null): string {
   return at === null ? LIVE_API + 'level' : `${REPLAY_API}level/${at}`
