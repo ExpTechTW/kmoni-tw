@@ -9,6 +9,7 @@ import {
   REPLAY_STEP_SEC,
   REPLAY_WINDOW_SEC,
   basemapOf,
+  levelTone,
   regionOf,
   shownRegion,
   type LayerKey,
@@ -17,6 +18,7 @@ import {
 } from '@/config'
 import { loadPref, savePref } from '@/storage'
 import { useLayerFrame } from '@/useLayerFrame'
+import { useLevel } from '@/useLevel'
 import { useNow } from '@/useNow'
 
 const THEMES = ['light', 'dark'] as const
@@ -38,6 +40,7 @@ export default function App() {
   const region = shownRegion(regionOf(regionKey), at)
   const active = LAYERS.find((l) => l.key === layer) ?? LAYERS[0]
   const { frame, status } = useLayerFrame(layer, region, at, paused)
+  const level = useLevel(at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
 
   useEffect(() => {
@@ -149,6 +152,9 @@ export default function App() {
       <footer>
         <span className={`dot ${status.tone}`} />
         <span className="state">{status.text}</span>
+        <span className={`level ${level === null ? '' : levelTone(level)}`}>
+          震動 Level: {level ?? '—'}
+        </span>
         <span className="time">{status.stamp}</span>
       </footer>
 

@@ -21,6 +21,12 @@
   --ok: #157f3d;
   --warn: #a15c00;
   --bad: #c62828;
+  /* 震動等級：淺色底要夠深才看得清楚，黃色尤其不能用純黃。 */
+  --lv-blue: #1d4ed8;
+  --lv-green: #157f3d;
+  --lv-yellow: #a16207;
+  --lv-orange: #c2410c;
+  --lv-red: #b91c1c;
 }
 
 :root[data-theme='dark'] {
@@ -36,6 +42,11 @@
   --ok: #3c3;
   --warn: #fc0;
   --bad: #f44;
+  --lv-blue: #4a9eff;
+  --lv-green: #3c3;
+  --lv-yellow: #fc0;
+  --lv-orange: #ff9430;
+  --lv-red: #ff5555;
 }
 
 html {
@@ -216,6 +227,30 @@ footer {
 .state {
   color: var(--fg);
   font-weight: 700;
+}
+
+.level {
+  margin-left: 4px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--off);
+}
+
+.level.blue {
+  color: var(--lv-blue);
+}
+.level.green {
+  color: var(--lv-green);
+}
+.level.yellow {
+  color: var(--lv-yellow);
+}
+.level.orange {
+  color: var(--lv-orange);
+}
+.level.red {
+  color: var(--lv-red);
 }
 
 .time {

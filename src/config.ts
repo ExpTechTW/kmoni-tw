@@ -81,3 +81,23 @@ export function frameUrl(layer: LayerKey, region: Region, at: number | null): st
 export function shownRegion(region: Region, at: number | null): Region {
   return at === null ? region : REGIONS[0]
 }
+
+/** 震動等級（純文字數字），即時與重播各有一個端點。 */
+export function levelUrl(at: number | null): string {
+  return at === null ? LIVE_API + 'level' : `${REPLAY_API}level/${at}`
+}
+
+export type LevelTone = 'blue' | 'green' | 'yellow' | 'orange' | 'red'
+
+/** 震動等級分級：由高到低比對，第一個符合的就是該級。 */
+const LEVEL_STEPS: { min: number; tone: LevelTone }[] = [
+  { min: 1500, tone: 'red' },
+  { min: 500, tone: 'orange' },
+  { min: 250, tone: 'yellow' },
+  { min: 30, tone: 'green' },
+  { min: 0, tone: 'blue' },
+]
+
+export function levelTone(level: number): LevelTone {
+  return LEVEL_STEPS.find((s) => level >= s.min)?.tone ?? 'blue'
+}
