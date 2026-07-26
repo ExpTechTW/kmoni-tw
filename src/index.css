@@ -100,6 +100,32 @@ header .btn {
   margin-left: auto;
 }
 
+/* 時間軸下方的工具列 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn.stop {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.recording {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bad);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 標籤會在「複製圖片／已複製／已下載」之間變動，固定寬度避免版面跳動。 */
+.btn.copy {
+  min-width: 76px;
+}
+
 /* 次要控制項：與分頁同風格但較小。 */
 .btn {
   min-height: 26px;

@@ -53,6 +53,9 @@ export function useFocusBasemap(theme: Theme): string | null {
 
     let stopped = false
     const img = new Image()
+    // 一定要帶 CORS：否則瀏覽器會快取一份「非 CORS」的副本，之後把它畫進 canvas
+    // 會污染畫布，複製合成圖就會失敗。raw.githubusercontent.com 有回 ACAO: *。
+    img.crossOrigin = 'anonymous'
     img.onload = () => {
       if (!stopped) setReady(url)
     }

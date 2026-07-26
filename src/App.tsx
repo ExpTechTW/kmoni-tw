@@ -21,13 +21,22 @@ import {
   type RegionKey,
   type Theme,
 } from '@/config'
+import { copyStack, type CopyResult } from '@/copyImage'
 import { loadPref, savePref } from '@/storage'
+import { MAX_FRAMES, useRecorder } from '@/useRecorder'
 import { useFocusBasemap } from '@/useFocusBasemap'
 import { useLayerFrame } from '@/useLayerFrame'
 import { useLevel } from '@/useLevel'
 import { useNow } from '@/useNow'
 
 const THEMES = ['light', 'dark'] as const
+
+const COPY_LABEL: Record<CopyResult | 'idle', string> = {
+  idle: '複製圖片',
+  copied: '已複製',
+  downloaded: '已下載',
+  failed: '複製失敗',
+}
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => loadPref('theme', THEMES, 'light'))
@@ -50,6 +59,9 @@ export default function App() {
   const active = resolveLayer(mode, layerKey)
   const layer = active.key
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const stackRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState<CopyResult | null>(null)
+  const rec = useRecorder(stackRef)
   const { status } = useLayerFrame(canvasRef, mode, layer, region, at, paused)
   const level = useLevel(mode, at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
@@ -66,6 +78,13 @@ export default function App() {
       .querySelector('meta[name=theme-color]')
       ?.setAttribute('content', theme === 'dark' ? '#000000' : '#ececec')
   }, [theme])
+
+  // 複製結果提示 2 秒後恢復
+  useEffect(() => {
+    if (!copied) return
+    const id = setTimeout(() => setCopied(null), 2000)
+    return () => clearTimeout(id)
+  }, [copied])
 
   useEffect(() => savePref('region', regionKey), [regionKey])
   useEffect(() => savePref('mode', modeKey), [modeKey])
@@ -125,6 +144,17 @@ export default function App() {
   function toLive() {
     setPaused(false)
     setAt(null)
+  }
+
+  async function onCopy() {
+    const stack = stackRef.current
+    if (stack) setCopied(await copyStack(stack))
+  }
+
+  // 錄影期間畫面必須持續前進，所以按下就自動播放，暫停鍵讓位給「錄製結束」。
+  function startRecording() {
+    setPaused(false)
+    rec.start()
   }
 
   return (
@@ -188,8 +218,13 @@ export default function App() {
       </div>
 
       {/* 由下往上：底圖、資料圖、圖例。資料圖不分深淺色。 */}
-      <div className="stack">
-        <img src={basemap} alt={`${region.label}底圖`} decoding="async" />
+      <div className="stack" ref={stackRef}>
+        <img
+          src={basemap}
+          alt={`${region.label}底圖`}
+          decoding="async"
+          crossOrigin="anonymous"
+        />
         <canvas ref={canvasRef} width={756} height={648} aria-hidden />
         {active.legend && (
           <img src={active.legend} alt={`${active.label}圖例`} decoding="async" />
@@ -218,12 +253,36 @@ export default function App() {
           onChange={(e) => seek(Number(e.target.value))}
           aria-label="重播時間"
         />
-        <button className="btn" onClick={() => setPaused((p) => !p)}>
-          {paused ? '播放' : '暫停'}
-        </button>
-        <button className="btn" onClick={toLive} disabled={!replaying}>
+        {/* 錄影中不能暫停（畫面要持續前進），這個位置改成結束錄製。 */}
+        {rec.recording ? (
+          <button className="btn stop" onClick={rec.stop}>
+            錄製結束
+          </button>
+        ) : (
+          <button className="btn" onClick={() => setPaused((p) => !p)}>
+            {paused ? '播放' : '暫停'}
+          </button>
+        )}
+        <button className="btn" onClick={toLive} disabled={!replaying || rec.recording}>
           即時模式
         </button>
+      </div>
+
+      <div className="tools">
+        <button className="btn copy" onClick={onCopy} title="把底圖、資料與圖例合成一張複製">
+          {COPY_LABEL[copied ?? 'idle']}
+        </button>
+        {rec.recording ? (
+          <span className="recording">
+            <span className="dot down" />
+            錄製中 {rec.frames}/{MAX_FRAMES} 張
+            {rec.files > 0 && `・已存 ${rec.files} 檔`}
+          </span>
+        ) : (
+          <button className="btn" onClick={startRecording} title="每秒一張合成 GIF，滿 10 分鐘自動分檔下載">
+            錄製開始
+          </button>
+        )}
       </div>
 
       <p className="disclaimer">僅供參考，應以中央氣象署發布之內容為準</p>
