@@ -91,14 +91,19 @@ export type Layer = Mode['layers'][number]
 export type LayerKey = Layer['key']
 export type Theme = 'light' | 'dark'
 
-/** 重播可回溯的長度：距今 2 小時。 */
+/**
+ * 重播時間軸的範圍：now-60s（新）～ now-2h-60s（舊）。
+ *
+ * 60 秒是資料入庫的緩衝，比這更新的時刻封存還沒寫進去。時間軸右端因此停在
+ * now-60s 而不是「現在」，否則右邊那一段永遠只會顯示「此時間無資料」。
+ */
+export const REPLAY_LAG_SEC = 60
+
+/** 從緩衝點再往回算的可回溯長度。 */
 export const REPLAY_WINDOW_SEC = 2 * 60 * 60
 
-/**
- * 封存落後現在約 6～7 分鐘（實測 now-400 秒才開始有資料），
- * 比這更新的時刻取不到影像，所以時間軸右端就停在這裡。
- */
-export const REPLAY_LAG_SEC = 420
+/** 時間軸最舊的位置（距現在幾秒）：2 小時再加上那 60 秒緩衝。 */
+export const REPLAY_OLDEST_SEC = REPLAY_WINDOW_SEC + REPLAY_LAG_SEC
 
 /** 播放時每幀前進 1 秒，間隔 1 秒 —— 與實際時間同速。 */
 export const REPLAY_STEP_SEC = 1

@@ -8,7 +8,7 @@ import {
   REPLAY_FRAME_MS,
   REPLAY_LAG_SEC,
   REPLAY_STEP_SEC,
-  REPLAY_WINDOW_SEC,
+  REPLAY_OLDEST_SEC,
   basemapOf,
   levelTone,
   modeReady,
@@ -133,7 +133,7 @@ export default function App() {
   const offset =
     at === null
       ? -REPLAY_LAG_SEC
-      : Math.min(-REPLAY_LAG_SEC, Math.max(-REPLAY_WINDOW_SEC, at - nowSec))
+      : Math.min(-REPLAY_LAG_SEC, Math.max(-REPLAY_OLDEST_SEC, at - nowSec))
 
   // 拖動時間軸是在檢視某一刻，先停下來比較合理。
   function seek(v: number) {
@@ -247,7 +247,7 @@ export default function App() {
       <div className="replay">
         <input
           type="range"
-          min={-REPLAY_WINDOW_SEC}
+          min={-REPLAY_OLDEST_SEC}
           max={-REPLAY_LAG_SEC}
           step={REPLAY_STEP_SEC}
           value={offset}
