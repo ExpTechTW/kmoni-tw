@@ -293,6 +293,10 @@ export default function App() {
             錄製開始
           </button>
         )}
+        {/* 獨立的一頁，另開視窗；它的程式碼不會進到首頁的 bundle。 */}
+        <a className="btn" href="./editor.html" target="_blank" rel="noopener">
+          GIF 編輯器
+        </a>
       </div>
 
       <p className="disclaimer">僅供參考，應以中央氣象署發布之內容為準</p>

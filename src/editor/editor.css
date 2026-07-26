@@ -1,0 +1,118 @@
+.editor {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 拖放區：沒有檔案時的主要目標，拖曳中要有明確回饋。 */
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 504px;
+  max-width: 100%;
+  min-height: 220px;
+  padding: 24px;
+  background: var(--panel);
+  border: 2px dashed var(--line);
+  color: var(--dim);
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop:hover,
+.drop.over {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.drop strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta b {
+  color: var(--fg);
+}
+
+/* 預覽區：canvas 上疊一層裁切框 */
+.stage {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  background: var(--map-bg);
+  border: 1px solid var(--line);
+  line-height: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.stage canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 框外壓暗，一眼看出會留下哪一塊 */
+.crop {
+  position: absolute;
+  outline: 1px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 45%);
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+
+.row > .label {
+  color: var(--dim);
+  min-width: 40px;
+}
+
+.row input[type='number'] {
+  width: 68px;
+  min-height: 26px;
+  padding: 2px 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.row .btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hint {
+  color: var(--dim);
+}
+
+.error {
+  color: var(--bad);
+  font-weight: 700;
+}
