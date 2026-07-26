@@ -137,6 +137,9 @@ export default function App() {
 
   // 拖動時間軸是在檢視某一刻，先停下來比較合理。
   function seek(v: number) {
+    // 錄影中一律不受理：光靠 input 的 disabled 只擋得住滑鼠，
+    // 任何其他呼叫進來都會讓錄到的 GIF 時間前後錯亂。
+    if (rec.recording) return
     setPaused(true)
     setAt(nowSec + v)
   }
@@ -248,8 +251,15 @@ export default function App() {
           max={-REPLAY_LAG_SEC}
           step={REPLAY_STEP_SEC}
           value={offset}
-          disabled={!mode.replay}
-          title={mode.replay ? undefined : `${mode.label}沒有封存資料，無法重播`}
+          // 錄影中鎖住：拖動會讓時間軸跳來跳去，錄出來的 GIF 會前後錯亂。
+          disabled={!mode.replay || rec.recording}
+          title={
+            rec.recording
+              ? '錄製中無法調整時間'
+              : mode.replay
+                ? undefined
+                : `${mode.label}沒有封存資料，無法重播`
+          }
           onChange={(e) => seek(Number(e.target.value))}
           aria-label="重播時間"
         />
