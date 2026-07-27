@@ -361,6 +361,32 @@ footer {
   cursor: pointer;
 }
 
+/* 微調列：直接輸入時刻 + 固定級距按鈕 */
+.replay.nudges {
+  flex-wrap: wrap;
+}
+
+.replay input[type='datetime-local'] {
+  min-height: 26px;
+  padding: 2px 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color-scheme: light dark;
+}
+
+.replay input[type='datetime-local']:disabled {
+  color: var(--off);
+}
+
+.btn.tiny {
+  min-height: 24px;
+  padding: 2px 7px;
+}
+
 /* 沒有封存的模式：時間軸整條變灰，明確表示不能拖。 */
 .replay input[type='range']:disabled {
   accent-color: var(--off);

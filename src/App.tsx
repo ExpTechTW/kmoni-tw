@@ -7,6 +7,7 @@ import {
   REGION_KEYS,
   REPLAY_FRAME_MS,
   REPLAY_LAG_SEC,
+  REPLAY_NUDGES,
   REPLAY_STEP_SEC,
   REPLAY_OLDEST_SEC,
   basemapOf,
@@ -128,21 +129,32 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [mode.layers])
 
-  // 滑桿是「距現在幾秒」。右端停在最新的封存時刻（而非現在），
-  // 因為比那更新的時刻還沒有存檔，拉過去只會取不到影像。
-  const offset =
-    at === null
-      ? -REPLAY_LAG_SEC
-      : Math.min(-REPLAY_LAG_SEC, Math.max(-REPLAY_OLDEST_SEC, at - nowSec))
+  // 時間軸的兩端：右端是最新的封存時刻（而非現在），因為比那更新的還沒入庫。
+  const newest = nowSec - REPLAY_LAG_SEC
+  const oldest = nowSec - REPLAY_OLDEST_SEC
+  const current = at ?? newest
 
-  // 拖動時間軸是在檢視某一刻，先停下來比較合理。
-  function seek(v: number) {
-    // 錄影中一律不受理：光靠 input 的 disabled 只擋得住滑鼠，
-    // 任何其他呼叫進來都會讓錄到的 GIF 時間前後錯亂。
+  // 滑桿的值是「距現在幾秒」。
+  const offset = Math.min(-REPLAY_LAG_SEC, Math.max(-REPLAY_OLDEST_SEC, current - nowSec))
+
+  // 跳到某個絕對時刻。錄影中一律不受理：光靠 input 的 disabled 只擋得住滑鼠，
+  // 任何其他呼叫進來都會讓錄到的 GIF 時間前後錯亂。
+  function seekTo(sec: number) {
     if (rec.recording) return
     setPaused(true)
-    setAt(nowSec + v)
+    setAt(Math.min(newest, Math.max(oldest, Math.round(sec))))
   }
+
+  function seek(v: number) {
+    seekTo(nowSec + v)
+  }
+
+  const locked = !mode.replay || rec.recording
+  const lockReason = rec.recording
+    ? '錄製中無法調整時間'
+    : mode.replay
+      ? undefined
+      : `${mode.label}沒有封存資料，無法重播`
 
   function toLive() {
     setPaused(false)
@@ -243,7 +255,7 @@ export default function App() {
         <span className="time">{status.stamp}</span>
       </footer>
 
-      {/* 即時模式沒有封存，時間軸與回到最新一併停用（暫停仍可用，那是停止輪詢）。 */}
+      {/* 即時模式沒有封存，整組時間軸停用（暫停仍可用，那是停止輪詢）。 */}
       <div className="replay">
         <input
           type="range"
@@ -252,14 +264,8 @@ export default function App() {
           step={REPLAY_STEP_SEC}
           value={offset}
           // 錄影中鎖住：拖動會讓時間軸跳來跳去，錄出來的 GIF 會前後錯亂。
-          disabled={!mode.replay || rec.recording}
-          title={
-            rec.recording
-              ? '錄製中無法調整時間'
-              : mode.replay
-                ? undefined
-                : `${mode.label}沒有封存資料，無法重播`
-          }
+          disabled={locked}
+          title={lockReason}
           onChange={(e) => seek(Number(e.target.value))}
           aria-label="重播時間"
         />
@@ -276,6 +282,35 @@ export default function App() {
         <button className="btn" onClick={toLive} disabled={!replaying || rec.recording}>
           即時模式
         </button>
+      </div>
+
+      {/* 48 小時攤在滑桿上每像素約 350 秒，選不到特定時刻，
+          所以再給「直接輸入時刻」與「固定級距微調」兩種精確操作。 */}
+      <div className="replay nudges">
+        <input
+          type="datetime-local"
+          step={1}
+          value={toLocalInput(current)}
+          min={toLocalInput(oldest)}
+          max={toLocalInput(newest)}
+          disabled={locked}
+          title={lockReason}
+          onChange={(e) => {
+            const sec = fromLocalInput(e.target.value)
+            if (sec !== null) seekTo(sec)
+          }}
+          aria-label="跳到指定時刻"
+        />
+        {REPLAY_NUDGES.map((n) => (
+          <button
+            key={n.sec}
+            className="btn tiny"
+            disabled={locked || current + n.sec < oldest || current + n.sec > newest}
+            onClick={() => seekTo(current + n.sec)}
+          >
+            {n.label}
+          </button>
+        ))}
       </div>
 
       <div className="tools">
@@ -302,4 +337,17 @@ export default function App() {
       <p className="disclaimer">僅供參考，應以中央氣象署發布之內容為準</p>
     </div>
   )
+}
+
+/** unix 秒 → datetime-local 需要的本地時間字串。 */
+function toLocalInput(sec: number): string {
+  const d = new Date(sec * 1000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/** 不帶時區的字串會被當成本地時間解讀，正是我們要的。 */
+function fromLocalInput(v: string): number | null {
+  const ms = new Date(v).getTime()
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
 }

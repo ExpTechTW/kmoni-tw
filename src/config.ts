@@ -99,8 +99,25 @@ export type Theme = 'light' | 'dark'
  */
 export const REPLAY_LAG_SEC = 60
 
-/** 從緩衝點再往回算的可回溯長度。 */
-export const REPLAY_WINDOW_SEC = 2 * 60 * 60
+/** 從緩衝點再往回算的可回溯長度。實測封存正好保留 48 小時（72 小時已 404）。 */
+export const REPLAY_WINDOW_SEC = 48 * 60 * 60
+
+/**
+ * 時間軸微調的級距。48 小時攤在滑桿上是每像素約 350 秒，
+ * 光靠拖曳選不到特定時刻，一定要有這排按鈕才實用。
+ */
+export const REPLAY_NUDGES = [
+  { sec: -3600, label: '−1時' },
+  { sec: -600, label: '−10分' },
+  { sec: -60, label: '−1分' },
+  { sec: -10, label: '−10秒' },
+  { sec: -1, label: '−1秒' },
+  { sec: 1, label: '+1秒' },
+  { sec: 10, label: '+10秒' },
+  { sec: 60, label: '+1分' },
+  { sec: 600, label: '+10分' },
+  { sec: 3600, label: '+1時' },
+] as const
 
 /** 時間軸最舊的位置（距現在幾秒）：2 小時再加上那 60 秒緩衝。 */
 export const REPLAY_OLDEST_SEC = REPLAY_WINDOW_SEC + REPLAY_LAG_SEC
