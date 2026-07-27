@@ -20,6 +20,7 @@
   --map-bg: #fff;
   --ok: #157f3d;
   --near: #0e7490; /* 近即時：青色，與綠燈及藍色重播燈都分得開 */
+  --cwa: #7c3aed; /* CWA：紫色 */
   --warn: #a15c00;
   --bad: #c62828;
   /* 震動等級：淺色底要夠深才看得清楚，黃色尤其不能用純黃。 */
@@ -42,6 +43,7 @@
   --map-bg: #2a2a2a;
   --ok: #3c3;
   --near: #2dd4bf;
+  --cwa: #a78bfa;
   --warn: #fc0;
   --bad: #f44;
   --lv-blue: #4a9eff;
@@ -298,6 +300,10 @@ footer {
 
 .dot.near {
   background: var(--near);
+}
+
+.dot.cwa {
+  background: var(--cwa);
 }
 
 .dot.lag {

@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  DEPTHS,
+  DEPTH_KEYS,
   LAYER_KEYS,
   MODES,
   MODE_KEYS,
   REGIONS,
   REGION_KEYS,
   REPLAY_FRAME_MS,
-  REPLAY_LAG_SEC,
   REPLAY_NUDGES,
   REPLAY_STEP_SEC,
-  REPLAY_OLDEST_SEC,
   basemapOf,
   levelTone,
   modeReady,
   regionOf,
   resolveLayer,
   resolveMode,
-  shownRegion,
+  type DepthKey,
   type LayerKey,
   type ModeKey,
   type RegionKey,
@@ -28,6 +28,7 @@ import { MAX_FRAMES, useRecorder } from '@/useRecorder'
 import { useFocusBasemap } from '@/useFocusBasemap'
 import { useLayerFrame } from '@/useLayerFrame'
 import { useLevel } from '@/useLevel'
+import { useModeWindow } from '@/useModeWindow'
 import { useNow } from '@/useNow'
 
 const THEMES = ['light', 'dark'] as const
@@ -46,6 +47,7 @@ export default function App() {
   )
   const [modeKey, setModeKey] = useState<ModeKey>(() => loadPref('mode', MODE_KEYS, 'realtime'))
   const [layerKey, setLayerKey] = useState<LayerKey>(() => loadPref('layer', LAYER_KEYS, 'int'))
+  const [depth, setDepth] = useState<DepthKey>(() => loadPref('depth', DEPTH_KEYS, 'surface'))
 
   // at 為 null 代表即時模式。重播位置不記憶，重開一律回到即時。
   const [at, setAt] = useState<number | null>(null)
@@ -53,19 +55,23 @@ export default function App() {
   const [paused, setPaused] = useState(false)
 
   const replaying = at !== null
-  // 重播只有全國視野，底圖要跟著換，否則會配上對不起來的資料圖。
-  const region = shownRegion(regionOf(regionKey), at)
   // 記住的模式／圖層可能還沒就緒，一律換算成真的能用的那一個。
   const mode = resolveMode(modeKey)
+  const region = regionOf(regionKey)
   const active = resolveLayer(mode, layerKey)
   const layer = active.key
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stackRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState<CopyResult | null>(null)
   const rec = useRecorder(stackRef)
-  const { status } = useLayerFrame(canvasRef, mode, layer, region, at, paused)
+  const { status } = useLayerFrame(canvasRef, mode, layer, region, at, paused, depth)
   const level = useLevel(mode, at, paused)
   const nowSec = Math.floor(useNow(1000) / 1000)
+
+  // 時間軸的可用區間：一般模式以「現在」推算，CWA 由它的 status 提供。
+  const win = useModeWindow(mode, nowSec)
+  const { oldest, newest } = win
+  const current = at ?? newest
 
   // focus 區域的中心會變，底圖定時從 raw 更新；抓不到就沿用 bundle 內的。
   const liveFocus = useFocusBasemap(theme)
@@ -90,29 +96,31 @@ export default function App() {
   useEffect(() => savePref('region', regionKey), [regionKey])
   useEffect(() => savePref('mode', modeKey), [modeKey])
   useEffect(() => savePref('layer', layer), [layer])
+  useEffect(() => savePref('depth', depth), [depth])
 
-  // 重播播放：每 REPLAY_FRAME_MS 前進 REPLAY_STEP_SEC 秒，最多到最新的封存時刻。
+  // 上界放進 ref：它每秒都在變，直接寫進 deps 會讓 1 秒的 interval 不斷重建而永遠不觸發。
+  const newestRef = useRef(newest)
+  newestRef.current = newest
+
+  // 重播播放：每 REPLAY_FRAME_MS 前進 REPLAY_STEP_SEC 秒，最多到可用區間的尾端。
   useEffect(() => {
     if (paused || !replaying) return
     const id = setInterval(() => {
-      setAt((t) => {
-        if (t === null) return null
-        const newest = Math.floor(Date.now() / 1000) - REPLAY_LAG_SEC
-        return Math.min(t + REPLAY_STEP_SEC, newest)
-      })
+      setAt((t) => (t === null ? null : Math.min(t + REPLAY_STEP_SEC, newestRef.current)))
     }, REPLAY_FRAME_MS)
     return () => clearInterval(id)
   }, [paused, replaying])
 
-  // 播到封存尾端就停下來，不然會一直重抓同一張。
+  // 換模式先回到即時；沒有即時端點的模式（CWA）改從可用區間尾端往前一小時開始播。
   useEffect(() => {
-    if (replaying && at !== null && at >= nowSec - REPLAY_LAG_SEC) setPaused(true)
-  }, [replaying, at, nowSec])
+    setAt(null)
+  }, [mode.key])
 
-  // 切到沒有封存的模式時要離開重播，否則會一直抓不到影像。
+  // 起播點就是上限（現在 −1 小時，或封存實際尾端，取較舊者）。
   useEffect(() => {
-    if (!mode.replay) setAt(null)
-  }, [mode.replay])
+    if (mode.live || win.pending) return
+    setAt((t) => (t === null ? newest : t))
+  }, [mode.key, mode.live, win.pending, newest])
 
   // 數字鍵切換目前模式底下「可用」的圖層。
   useEffect(() => {
@@ -129,14 +137,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [mode.layers])
 
-  // 時間軸的兩端：右端是最新的封存時刻（而非現在），因為比那更新的還沒入庫。
-  const newest = nowSec - REPLAY_LAG_SEC
-  const oldest = nowSec - REPLAY_OLDEST_SEC
-  const current = at ?? newest
-
-  // 滑桿的值是「距現在幾秒」。
-  const offset = Math.min(-REPLAY_LAG_SEC, Math.max(-REPLAY_OLDEST_SEC, current - nowSec))
-
   // 跳到某個絕對時刻。錄影中一律不受理：光靠 input 的 disabled 只擋得住滑鼠，
   // 任何其他呼叫進來都會讓錄到的 GIF 時間前後錯亂。
   function seekTo(sec: number) {
@@ -145,21 +145,26 @@ export default function App() {
     setAt(Math.min(newest, Math.max(oldest, Math.round(sec))))
   }
 
-  function seek(v: number) {
-    seekTo(nowSec + v)
-  }
-
-  const locked = !mode.replay || rec.recording
+  const locked = !mode.replay || rec.recording || win.pending
   const lockReason = rec.recording
     ? '錄製中無法調整時間'
-    : mode.replay
-      ? undefined
-      : `${mode.label}沒有封存資料，無法重播`
+    : win.pending
+      ? '正在取得可用時間範圍…'
+      : mode.replay
+        ? undefined
+        : `${mode.label}沒有封存資料，無法重播`
 
   function toLive() {
     setPaused(false)
     setAt(null)
   }
+
+  // 「等待新資料」只在上限真的不動時才顯示。正常追著邊界播放時 at 與 newest
+  // 每秒一起前進，光看 at >= newest 會永遠成立而誤報。
+  const lastAdvance = useRef({ value: newest, sec: nowSec })
+  if (newest !== lastAdvance.current.value) lastAdvance.current = { value: newest, sec: nowSec }
+  const stalled = nowSec - lastAdvance.current.sec >= 3
+  const atEnd = replaying && at !== null && at >= newest && stalled
 
   async function onCopy() {
     const stack = stackRef.current
@@ -201,15 +206,28 @@ export default function App() {
         ))}
       </nav>
 
-      {/* 重播中封存只有全國視野，focus 區域先停用，選取狀態也顯示實際呈現的區域。 */}
+      {/* 只有 CWA 有井下資料，其他模式不顯示這一列。 */}
+      {mode.depths && (
+        <nav className="tabs" role="tablist" aria-label="深度">
+          {DEPTHS.map((d) => (
+            <button
+              key={d.key}
+              role="tab"
+              aria-selected={d.key === depth}
+              onClick={() => setDepth(d.key)}
+            >
+              {d.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       <nav className="tabs" role="tablist" aria-label="區域">
         {REGIONS.map((r) => (
           <button
             key={r.key}
             role="tab"
             aria-selected={r.key === region.key}
-            disabled={replaying && r.focus}
-            title={replaying && r.focus ? '重播沒有此區域的封存影像' : undefined}
             onClick={() => setRegionKey(r.key)}
           >
             {r.label}
@@ -248,10 +266,15 @@ export default function App() {
 
       <footer>
         <span className={`dot ${status.tone}`} />
-        <span className="state">{status.text}</span>
-        <span className={`level ${level === null ? '' : levelTone(level)}`}>
-          震動 Level: {level ?? '—'}
+        <span className="state">
+          {status.text}
+          {atEnd && !paused && '（等待新資料）'}
         </span>
+        {mode.hasLevel && (
+          <span className={`level ${level === null ? '' : levelTone(level)}`}>
+            震動 Level: {level ?? '—'}
+          </span>
+        )}
         <span className="time">{status.stamp}</span>
       </footer>
 
@@ -259,14 +282,14 @@ export default function App() {
       <div className="replay">
         <input
           type="range"
-          min={-REPLAY_OLDEST_SEC}
-          max={-REPLAY_LAG_SEC}
+          min={oldest}
+          max={newest}
           step={REPLAY_STEP_SEC}
-          value={offset}
+          value={current}
           // 錄影中鎖住：拖動會讓時間軸跳來跳去，錄出來的 GIF 會前後錯亂。
           disabled={locked}
           title={lockReason}
-          onChange={(e) => seek(Number(e.target.value))}
+          onChange={(e) => seekTo(Number(e.target.value))}
           aria-label="重播時間"
         />
         {/* 錄影中不能暫停（畫面要持續前進），這個位置改成結束錄製。 */}
@@ -279,7 +302,12 @@ export default function App() {
             {paused ? '播放' : '暫停'}
           </button>
         )}
-        <button className="btn" onClick={toLive} disabled={!replaying || rec.recording}>
+        <button
+          className="btn"
+          onClick={toLive}
+          disabled={!mode.live || !replaying || rec.recording}
+          title={mode.live ? undefined : `${mode.label}沒有即時資料，只能依時刻播放`}
+        >
           即時模式
         </button>
       </div>

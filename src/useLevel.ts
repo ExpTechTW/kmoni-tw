@@ -32,6 +32,12 @@ export function useLevel(mode: Mode, at: number | null, paused: boolean): number
   }, [])
 
   useEffect(() => {
+    // 這個模式沒有等級端點就完全不抓（例如 CWA）
+    if (!mode.hasLevel) {
+      setLevel(null)
+      return
+    }
+    if (!url) return
     if (live && paused) return
 
     let scheduling = true
@@ -78,7 +84,7 @@ export function useLevel(mode: Mode, at: number | null, paused: boolean): number
       scheduling = false
       if (timer) clearInterval(timer)
     }
-  }, [url, live, paused])
+  }, [url, live, paused, mode.hasLevel])
 
   return level
 }

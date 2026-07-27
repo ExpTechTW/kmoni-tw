@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { frameUrl, type LayerKey, type Mode, type Region } from '@/config'
+import { frameUrl, type DepthKey, type LayerKey, type Mode, type Region } from '@/config'
 import { useNow } from '@/useNow'
 
 const PERIOD = 1000 //  即時模式每秒發一次請求（固定節奏，不受 RTT 影響）
@@ -9,7 +9,7 @@ const DEAD = 12000 //   超過此毫秒數未更新視為中斷
 const MAX_FAILS = 3 //  連續失敗幾次後視為中斷
 const MAX_INFLIGHT = 4 // 同時在途的請求上限，網路太慢時就跳過該輪
 
-export type Tone = 'init' | 'live' | 'near' | 'lag' | 'down' | 'replay' | 'paused'
+export type Tone = 'init' | 'live' | 'near' | 'cwa' | 'lag' | 'down' | 'replay' | 'paused'
 
 export interface Status {
   tone: Tone
@@ -51,6 +51,7 @@ export function useLayerFrame(
   region: Region,
   at: number | null,
   paused: boolean,
+  depth: DepthKey,
 ) {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [lastOk, setLastOk] = useState(0)
@@ -63,7 +64,7 @@ export function useLayerFrame(
   const gen = useRef(0) //      圖層／區域的世代，換了就作廢所有在途結果
   const inflight = useRef(new Set<AbortController>())
 
-  const url = frameUrl(mode, layer, region, at)
+  const url = frameUrl(mode, layer, region, at, depth)
   const live = at === null
 
   // 換圖層或區域時清掉畫面，避免 PGA 的資料配上 PGV 的圖例，
@@ -79,7 +80,7 @@ export function useLayerFrame(
     setOutcome(null)
     setLastOk(0)
     setFails(0)
-  }, [canvasRef, mode.key, layer, region.key])
+  }, [canvasRef, mode.key, layer, region.key, depth])
 
   // 卸載時收乾淨。
   useEffect(() => {
@@ -91,6 +92,8 @@ export function useLayerFrame(
   }, [])
 
   useEffect(() => {
+    // 網址為空代表這個模式還沒有可抓的時刻（例如 CWA 尚未取得可用區間）。
+    if (!url) return
     // 即時模式暫停：停止輪詢，畫面停在最後一張。
     // 重播模式仍要抓，否則拖到的那一刻會沒有畫面。
     if (live && paused) return
