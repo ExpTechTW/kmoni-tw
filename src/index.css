@@ -288,9 +288,10 @@ footer {
   flex: none;
 }
 
-/* 即時與近即時都在持續更新，所以都會閃，但用不同顏色區分資料來源。 */
+/* 即時、近即時與追著最新播放的 CWA 都在持續更新，所以都會閃，但用不同顏色區分資料來源。 */
 .dot.live,
-.dot.near {
+.dot.near,
+.dot.cwa {
   animation: blink 1s steps(1, end) infinite;
 }
 
@@ -414,7 +415,8 @@ footer {
 
 @media (prefers-reduced-motion: reduce) {
   .dot.live,
-  .dot.near {
+  .dot.near,
+  .dot.cwa {
     animation: none;
   }
 }

@@ -111,7 +111,7 @@ export default function App() {
     return () => clearInterval(id)
   }, [paused, replaying])
 
-  // 換模式先回到即時；沒有即時端點的模式（CWA）改從可用區間尾端往前一小時開始播。
+  // 換模式先回到即時；沒有即時端點的模式（CWA）改從最新時刻開始播。
   useEffect(() => {
     setAt(null)
   }, [mode.key])
@@ -154,10 +154,18 @@ export default function App() {
         ? undefined
         : `${mode.label}沒有封存資料，無法重播`
 
+  // 沒有即時端點的模式（CWA）沒有「即時」可回，對應的是「最新」：跳到上限並繼續播。
   function toLive() {
     setPaused(false)
-    setAt(null)
+    setAt(mode.live ? null : newest)
   }
+
+  // 正在追著上限播放。播放與上限各自每秒前進，兩者差一秒是常態，所以留一點寬容。
+  const following = !mode.live && replaying && !paused && at !== null && newest - at <= 2
+  // 這時 CWA 的畫面就是它能給的最新資料，狀態列標成「最新」而不是「重播」；
+  // 抓圖失敗等其他狀態照原樣顯示。
+  const latest = following && status.tone === 'replay'
+  const tone = latest ? mode.tone : status.tone
 
   // 「等待新資料」只在上限真的不動時才顯示。正常追著邊界播放時 at 與 newest
   // 每秒一起前進，光看 at >= newest 會永遠成立而誤報。
@@ -265,9 +273,9 @@ export default function App() {
       </div>
 
       <footer>
-        <span className={`dot ${status.tone}`} />
+        <span className={`dot ${tone}`} />
         <span className="state">
-          {status.text}
+          {latest ? '最新' : status.text}
           {atEnd && !paused && '（等待新資料）'}
         </span>
         {mode.hasLevel && (
@@ -305,10 +313,10 @@ export default function App() {
         <button
           className="btn"
           onClick={toLive}
-          disabled={!mode.live || !replaying || rec.recording}
-          title={mode.live ? undefined : `${mode.label}沒有即時資料，只能依時刻播放`}
+          disabled={rec.recording || (mode.live ? !replaying : win.pending || following)}
+          title={mode.live ? undefined : '跳到目前可取得的最新時刻並繼續播放'}
         >
-          即時模式
+          {mode.live ? '即時模式' : '最新'}
         </button>
       </div>
 
