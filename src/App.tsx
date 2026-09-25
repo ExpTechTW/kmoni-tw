@@ -116,7 +116,7 @@ export default function App() {
     setAt(null)
   }, [mode.key])
 
-  // 起播點就是上限（現在 −1 小時，或封存實際尾端，取較舊者）。
+  // 起播點就是上限：後端給的最新時刻，之後照實際時間追著它播。
   useEffect(() => {
     if (mode.live || win.pending) return
     setAt((t) => (t === null ? newest : t))

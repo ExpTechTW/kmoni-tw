@@ -100,8 +100,9 @@ export const MODES = [
     hasLevel: false,
     status: 'https://api.core-tnn1.exptech.dev/api/v1/kmoni-tw/cwa-img/status',
     replay: true,
-    // CWA：最新不得超過 now−95 分（實際再與 available_until 取較舊者）
-    lagSec: 95 * 60,
+    // CWA 的上限完全由後端決定：now − 實測的歸檔延遲，且不超過已寫完的那一小時。
+    // 前端再壓一層只會多落後，還會在後端已經有資料時讓時間軸停住。
+    lagSec: 0,
     layers: [
       { key: 'int', label: '震度', legend: cwaInt, ready: true },
       { key: 'pga', label: '最大加速度', legend: cwaPga, ready: true },
@@ -149,8 +150,7 @@ export type Theme = 'light' | 'dark'
  * 入庫緩衝寫在各模式的 lagSec：比「現在 − lagSec」更新的時刻封存還沒寫進去，
  * 時間軸右端因此停在那裡，否則右邊那一段永遠只會顯示「此時間無資料」。
  *
- * CWA 與近即時的落後幅度差很多（95 分 vs 約 2 分），所以分開設定而不共用常數。
- * CWA 另外還會與 status 的 available_until 取較舊者。
+ * 近即時約 2 分；CWA 為 0，上限改由 status 提供（見 useModeWindow）。
  */
 
 /** 從緩衝點再往回算的可回溯長度。實測封存正好保留 48 小時（72 小時已 404）。 */
